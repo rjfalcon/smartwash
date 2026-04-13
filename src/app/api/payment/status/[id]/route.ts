@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { tuyaSwitchOff } from '@/lib/tuya';
 
 export async function GET(
   _request: NextRequest,
@@ -11,7 +12,7 @@ export async function GET(
     const payment = await db.payment.findUnique({
       where: { id },
       include: {
-        machine: { select: { name: true, type: true } },
+        machine: true,
       },
     });
 
@@ -31,13 +32,19 @@ export async function GET(
       secondsRemaining = Math.max(0, Math.floor(msLeft / 1000));
       minutesRemaining = Math.max(0, Math.floor(secondsRemaining / 60));
 
-      // Auto-expire if time is up
+      // Auto-expire: turn off plug + mark completed
       if (msLeft <= 0) {
+        // Fire-and-forget Tuya off (don't block response)
+        tuyaSwitchOff(payment.machine.tuyaDeviceId).catch((e) =>
+          console.error('[status] Tuya off failed:', e),
+        );
         await db.payment.update({
           where: { id: payment.id },
           data: { status: 'COMPLETED' },
         });
         payment.status = 'COMPLETED';
+        secondsRemaining = 0;
+        minutesRemaining = 0;
       }
     }
 
@@ -47,7 +54,7 @@ export async function GET(
         id: payment.id,
         mollieId: payment.mollieId,
         machineId: payment.machineId,
-        machine: payment.machine,
+        machine: { name: payment.machine.name, type: payment.machine.type },
         status: payment.status,
         amount: payment.amount,
         duration: payment.duration,
