@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Machine {
+  id           String    @id @default(cuid())
+  name         String
+  type         String    // WASHER | DRYER
+  tuyaDeviceId String
+  description  String    @default("")
+  isActive     Boolean   @default(true)
+  sortOrder    Int       @default(0)
+  payments     Payment[]
+  options      PaymentOption[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model PaymentOption {
+  id        String   @id @default(cuid())
+  machineId String
+  machine   Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  label     String   // "30 minuten", "1 uur"
+  duration  Int      // minutes
+  price     Float    // EUR
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  machineId     String
+  machine       Machine       @relation(fields: [machineId], references: [id])
+  mollieId      String        @unique
+  amount        Float
+  duration      Int           // minutes
+  optionLabel   String
+  status        String        @default("PENDING") // PENDING | PAID | ACTIVE | COMPLETED | FAILED | EXPIRED | CANCELLED
+  customerEmail String?
+  customerName  String?
+  startedAt     DateTime?
+  endsAt        DateTime?
+  warningsSent  Int           @default(0)
+  notes         String        @default("")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model AppSettings {
+  id              String  @id @default("singleton")
+  adminPin        String  @default("1234")
+  notifyEmails    String  @default("")  // comma-separated
+  parkName        String  @default("Ons Park")
+  appName         String  @default("SmartWash")
+  baseUrl         String  @default("")
+  tuyaAutoOff     Boolean @default(true)
+  emailOnPayment  Boolean @default(true)
+}
